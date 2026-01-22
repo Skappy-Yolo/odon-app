@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw, LogOut, AlertCircle } from 'lucide-react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -40,11 +40,79 @@ interface NavigationState {
 
 // Loading screen component
 function LoadingScreen() {
+  const { retryInitialization, signOut, error } = useAuth();
+  const [showRetry, setShowRetry] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  // Show retry button after 5 seconds of loading
+  useEffect(() => {
+    const timer = setTimeout(() => setShowRetry(true), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      await retryInitialization();
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      window.location.reload();
+    } catch (e) {
+      // Force reload anyway
+      window.location.reload();
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--color-background))] to-white flex items-center justify-center">
-      <div className="text-center">
-        <Loader2 className="w-12 h-12 animate-spin text-[hsl(var(--color-primary))] mx-auto mb-4" />
-        <p className="text-[hsl(var(--color-text-secondary))]">Loading...</p>
+    <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--color-background))] to-white flex items-center justify-center p-4">
+      <div className="text-center max-w-sm">
+        {error ? (
+          <>
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-[hsl(var(--color-text-primary))] font-medium mb-2">Something went wrong</p>
+            <p className="text-[hsl(var(--color-text-secondary))] text-sm mb-6">{error}</p>
+          </>
+        ) : (
+          <>
+            <Loader2 className="w-12 h-12 animate-spin text-[hsl(var(--color-primary))] mx-auto mb-4" />
+            <p className="text-[hsl(var(--color-text-secondary))]">Loading...</p>
+          </>
+        )}
+        
+        {(showRetry || error) && (
+          <div className="mt-6 space-y-3">
+            <button
+              onClick={handleRetry}
+              disabled={retrying}
+              className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-[hsl(var(--color-primary))] text-white rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {retrying ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-5 h-5" />
+              )}
+              {retrying ? 'Retrying...' : 'Try Again'}
+            </button>
+            
+            <button
+              onClick={handleSignOut}
+              className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            >
+              <LogOut className="w-5 h-5" />
+              Sign Out & Start Fresh
+            </button>
+            
+            <p className="text-xs text-[hsl(var(--color-text-secondary))] mt-4">
+              If this keeps happening, try signing out and logging in again.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

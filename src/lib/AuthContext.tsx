@@ -38,6 +38,10 @@ interface AuthContextType {
   // Profile methods
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  
+  // Recovery methods
+  retryInitialization: () => Promise<void>;
+  clearErrorAndRetry: () => Promise<void>;
 
   // State
   isAuthenticated: boolean;
@@ -161,37 +165,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Initialize auth state
-  useEffect(() => {
-    const initialize = async () => {
-      try {
-        // First, handle any auth callback in the URL
-        const callbackSession = await handleAuthCallback();
-        
-        // Get session (either from callback or existing)
-        const { data: { session } } = await supabase.auth.getSession();
-        const activeSession = callbackSession || session;
-        
-        setSession(activeSession);
-        setUser(activeSession?.user || null);
+  const initialize = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // First, handle any auth callback in the URL
+      const callbackSession = await handleAuthCallback();
+      
+      // Get session (either from callback or existing)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        setError('Failed to get session. Please try again.');
+        setLoading(false);
+        return;
+      }
+      
+      const activeSession = callbackSession || session;
+      
+      setSession(activeSession);
+      setUser(activeSession?.user || null);
 
-        if (activeSession?.user) {
-          // Try to get or create profile
-          let userProfile = await fetchProfile(activeSession.user.id);
+      if (activeSession?.user) {
+        // Try to get or create profile with timeout
+        const timeoutPromise = new Promise<null>((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+        );
+        
+        try {
+          let userProfile = await Promise.race([
+            fetchProfile(activeSession.user.id),
+            timeoutPromise
+          ]) as UserProfile | null;
           
           if (!userProfile) {
             userProfile = await createProfile(activeSession.user);
           }
           
           setProfile(userProfile);
+          
+          if (!userProfile) {
+            // Profile still not found/created - but continue anyway
+            // User can still use the app, profile will be created on next action
+            console.warn('Could not load or create profile, continuing without it');
+          }
+        } catch (profileError) {
+          console.error('Profile error:', profileError);
+          // Don't block the app - continue with null profile
+          // The user is authenticated, they can retry or proceed
+          setProfile(null);
         }
-
-        setLoading(false);
-      } catch (err) {
-        console.error('Error initializing auth:', err);
-        setLoading(false);
       }
-    };
 
+      setLoading(false);
+    } catch (err) {
+      console.error('Error initializing auth:', err);
+      setError('Something went wrong. Please refresh or try again.');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     initialize();
 
     // Listen for auth changes
@@ -345,6 +381,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await updateProfile({ onboarding_completed: true });
   };
 
+  // Retry initialization (for when loading gets stuck)
+  const retryInitialization = async () => {
+    await initialize();
+  };
+
+  // Clear error and retry
+  const clearErrorAndRetry = async () => {
+    setError(null);
+    await initialize();
+  };
+
   const value: AuthContextType = {
     user,
     profile,
@@ -359,6 +406,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     updateProfile,
     completeOnboarding,
+    retryInitialization,
+    clearErrorAndRetry,
     isAuthenticated: !!user,
     isNewUser: !!profile && !profile.onboarding_completed,
     needsOnboarding: !!profile && !profile.onboarding_completed,
