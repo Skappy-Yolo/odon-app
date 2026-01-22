@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { OnboardingScreen } from './screens/OnboardingScreen';
@@ -17,28 +18,7 @@ import { JoinGroupScreen } from './screens/JoinGroupScreen';
 import { ProfileSetupScreen } from './screens/ProfileSetupScreen';
 import { groupsApi } from './lib/api';
 
-type Screen =
-  | 'onboarding'
-  | 'welcome'
-  | 'profile-setup'
-  | 'create-group'
-  | 'join-group'
-  | 'home'
-  | 'group'
-  | 'check-in'
-  | 'availability-match'
-  | 'location-picker'
-  | 'hangout-confirmed'
-  | 'settings'
-  | 'notifications'
-  | 'group-settings';
-
-interface NavigationState {
-  screen: Screen;
-  data?: any;
-}
-
-// Simple loading screen - just shows briefly during initial load
+// Simple loading screen
 function LoadingScreen() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[hsl(var(--color-background))] to-white flex items-center justify-center p-4">
@@ -50,35 +30,30 @@ function LoadingScreen() {
   );
 }
 
-// Main App Content (needs to be inside AuthProvider)
-function AppContent() {
-  const { user, profile, loading, isAuthenticated, needsOnboarding } = useAuth();
-  const [navigationStack, setNavigationStack] = useState<NavigationState[]>([
-    { screen: 'home' }
-  ]);
+// Protected route wrapper - redirects to login if not authenticated
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    // Save the attempted URL for redirecting after login
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Home page wrapper - checks for groups and redirects appropriately
+function HomePage() {
+  const { user, isAuthenticated, needsOnboarding } = useAuth();
+  const navigate = useNavigate();
   const [userGroups, setUserGroups] = useState<any[]>([]);
-  const [loadingGroups, setLoadingGroups] = useState(true);
-  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Check for invite code in URL
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('invite') || params.get('code');
-    if (code) {
-      setInviteCode(code);
-      // Clean URL without reload
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-
-    // Also check for /join/:code pattern
-    const pathMatch = window.location.pathname.match(/\/join\/([A-Z0-9]+)/i);
-    if (pathMatch) {
-      setInviteCode(pathMatch[1]);
-      window.history.replaceState({}, '', '/');
-    }
-  }, []);
-
-  // Fetch user groups when authenticated
   useEffect(() => {
     async function fetchGroups() {
       if (isAuthenticated && user) {
@@ -89,200 +64,386 @@ function AppContent() {
           console.error('Error fetching groups:', error);
           setUserGroups([]);
         }
-        setLoadingGroups(false);
       }
+      setLoading(false);
     }
-
-    if (isAuthenticated) {
-      fetchGroups();
-    } else {
-      setLoadingGroups(false);
-    }
+    fetchGroups();
   }, [isAuthenticated, user]);
 
-  const currentNav = navigationStack[navigationStack.length - 1];
-
-  const handleNavigate = (screen: Screen, data?: any) => {
-    setNavigationStack(prev => [...prev, { screen, data }]);
-  };
-
-  const handleBack = () => {
-    if (navigationStack.length > 1) {
-      setNavigationStack(prev => prev.slice(0, -1));
-    }
-  };
-
-  const handleOnboardingComplete = () => {
-    // After onboarding, refresh to check profile/groups
-    window.location.reload();
-  };
-
-  const handleProfileComplete = () => {
-    // Check if there is an invite code
-    if (inviteCode) {
-      setNavigationStack([{ screen: 'join-group', data: { inviteCode } }]);
-    } else if (userGroups.length === 0) {
-      setNavigationStack([{ screen: 'welcome' }]);
-    } else {
-      setNavigationStack([{ screen: 'home' }]);
-    }
-  };
-
-  const handleGroupCreated = (group: any) => {
-    setUserGroups(prev => [...prev, group]);
-    setNavigationStack([{ screen: 'group', data: group }]);
-  };
-
-  const handleGroupJoined = (group: any) => {
-    setUserGroups(prev => [...prev, group]);
-    setInviteCode(null);
-    setNavigationStack([{ screen: 'group', data: group }]);
-  };
-
-  // Show loading while checking auth
-  if (loading || (isAuthenticated && loadingGroups)) {
+  if (loading) {
     return <LoadingScreen />;
   }
 
-  // Not authenticated -> Show onboarding
-  if (!isAuthenticated) {
-    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
-  }
-
-  // Authenticated but needs profile setup
   if (needsOnboarding) {
-    return <ProfileSetupScreen onComplete={handleProfileComplete} />;
+    return <Navigate to="/profile-setup" replace />;
   }
 
-  // Has invite code -> Go to join group
-  if (inviteCode && currentNav.screen !== 'join-group') {
-    return (
-      <JoinGroupScreen
-        inviteCode={inviteCode}
-        onBack={() => {
-          setInviteCode(null);
-          setNavigationStack([{ screen: userGroups.length > 0 ? 'home' : 'welcome' }]);
-        }}
-        onJoined={handleGroupJoined}
-      />
-    );
-  }
-
-  // No groups -> Show welcome screen
-  if (userGroups.length === 0 && currentNav.screen === 'home') {
+  // No groups - show welcome screen
+  if (userGroups.length === 0) {
     return (
       <WelcomeScreen
-        onCreateGroup={() => handleNavigate('create-group')}
-        onJoinGroup={() => handleNavigate('join-group')}
+        onCreateGroup={() => navigate('/create-group')}
+        onJoinGroup={() => navigate('/join-group')}
       />
     );
   }
 
-  // Render current screen
-  switch (currentNav.screen) {
-    case 'welcome':
-      return (
-        <WelcomeScreen
-          onCreateGroup={() => handleNavigate('create-group')}
-          onJoinGroup={() => handleNavigate('join-group')}
-        />
-      );
-
-    case 'create-group':
-      return (
-        <CreateGroupScreen
-          onBack={handleBack}
-          onCreated={handleGroupCreated}
-        />
-      );
-
-    case 'join-group':
-      return (
-        <JoinGroupScreen
-          inviteCode={currentNav.data?.inviteCode}
-          onBack={handleBack}
-          onJoined={handleGroupJoined}
-        />
-      );
-
-    case 'home':
-      return (
-        <HomeScreen
-          onNavigate={handleNavigate}
-          hasGroups={userGroups.length > 0}
-          groups={userGroups}
-        />
-      );
-
-    case 'group':
-      return (
-        <GroupScreen
-          group={currentNav.data}
-          onBack={handleBack}
-          onNavigate={handleNavigate}
-        />
-      );
-
-    case 'check-in':
-      return (
-        <CheckInScreen
-          group={currentNav.data}
-          onBack={handleBack}
-          onNavigate={handleNavigate}
-        />
-      );
-
-    case 'availability-match':
-      return (
-        <AvailabilityMatchScreen
-          onBack={handleBack}
-          onNavigate={handleNavigate}
-        />
-      );
-
-    case 'location-picker':
-      return (
-        <LocationPickerScreen
-          match={currentNav.data?.match}
-          onBack={handleBack}
-          onNavigate={handleNavigate}
-        />
-      );
-
-    case 'hangout-confirmed':
-      return (
-        <HangoutConfirmedScreen
-          onNavigate={(screen) => {
-            setNavigationStack([{ screen: screen as Screen }]);
-          }}
-        />
-      );
-
-    case 'settings':
-      return <SettingsScreen onBack={handleBack} />;
-
-    case 'notifications':
-      return <NotificationsScreen onBack={handleBack} onNavigate={handleNavigate} />;
-
-    case 'group-settings':
-      return <GroupSettingsScreen group={currentNav.data} onBack={handleBack} />;
-
-    default:
-      return (
-        <HomeScreen
-          onNavigate={handleNavigate}
-          hasGroups={userGroups.length > 0}
-          groups={userGroups}
-        />
-      );
-  }
+  // Has groups - show home screen
+  return (
+    <HomeScreen
+      onNavigate={(screen, data) => {
+        switch (screen) {
+          case 'group':
+            navigate(`/group/${data?.id}`);
+            break;
+          case 'settings':
+            navigate('/settings');
+            break;
+          case 'notifications':
+            navigate('/notifications');
+            break;
+          case 'create-group':
+            navigate('/create-group');
+            break;
+          case 'join-group':
+            navigate('/join-group');
+            break;
+          default:
+            navigate('/');
+        }
+      }}
+      hasGroups={userGroups.length > 0}
+      groups={userGroups}
+    />
+  );
 }
 
-// Root App component with AuthProvider
+// Create Group page wrapper
+function CreateGroupPage() {
+  const navigate = useNavigate();
+
+  const handleCreated = (group: any) => {
+    navigate(`/group/${group.id}`, { replace: true });
+  };
+
+  return (
+    <CreateGroupScreen
+      onBack={() => navigate(-1)}
+      onCreated={handleCreated}
+    />
+  );
+}
+
+// Join Group page wrapper
+function JoinGroupPage() {
+  const navigate = useNavigate();
+  const { code } = useParams();
+
+  const handleJoined = (group: any) => {
+    navigate(`/group/${group.id}`, { replace: true });
+  };
+
+  return (
+    <JoinGroupScreen
+      inviteCode={code}
+      onBack={() => navigate(-1)}
+      onJoined={handleJoined}
+    />
+  );
+}
+
+// Group page wrapper
+function GroupPage() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const [group, setGroup] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchGroup() {
+      if (id) {
+        try {
+          const groupData = await groupsApi.getGroup(id);
+          setGroup(groupData);
+        } catch (error) {
+          console.error('Error fetching group:', error);
+        }
+      }
+      setLoading(false);
+    }
+    fetchGroup();
+  }, [id]);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (!group) {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <GroupScreen
+      group={group}
+      onBack={() => navigate('/')}
+      onNavigate={(screen, data) => {
+        switch (screen) {
+          case 'check-in':
+            navigate(`/group/${id}/check-in`);
+            break;
+          case 'group-settings':
+            navigate(`/group/${id}/settings`);
+            break;
+          default:
+            navigate('/');
+        }
+      }}
+    />
+  );
+}
+
+// Check-in page wrapper
+function CheckInPage() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const [group, setGroup] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchGroup() {
+      if (id) {
+        try {
+          const groupData = await groupsApi.getGroup(id);
+          setGroup(groupData);
+        } catch (error) {
+          console.error('Error fetching group:', error);
+        }
+      }
+      setLoading(false);
+    }
+    fetchGroup();
+  }, [id]);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (!group) {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <CheckInScreen
+      group={group}
+      onBack={() => navigate(`/group/${id}`)}
+      onNavigate={(screen, data) => {
+        if (screen === 'availability-match') {
+          navigate('/availability-match', { state: data });
+        }
+      }}
+    />
+  );
+}
+
+// Group Settings page wrapper
+function GroupSettingsPage() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const [group, setGroup] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchGroup() {
+      if (id) {
+        try {
+          const groupData = await groupsApi.getGroup(id);
+          setGroup(groupData);
+        } catch (error) {
+          console.error('Error fetching group:', error);
+        }
+      }
+      setLoading(false);
+    }
+    fetchGroup();
+  }, [id]);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (!group) {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <GroupSettingsScreen
+      group={group}
+      onBack={() => navigate(`/group/${id}`)}
+    />
+  );
+}
+
+// Settings page wrapper
+function SettingsPage() {
+  const navigate = useNavigate();
+  return <SettingsScreen onBack={() => navigate('/')} />;
+}
+
+// Notifications page wrapper
+function NotificationsPage() {
+  const navigate = useNavigate();
+  return (
+    <NotificationsScreen
+      onBack={() => navigate('/')}
+      onNavigate={(screen, data) => {
+        if (screen === 'group' && data?.id) {
+          navigate(`/group/${data.id}`);
+        }
+      }}
+    />
+  );
+}
+
+// Profile setup page wrapper
+function ProfileSetupPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  return (
+    <ProfileSetupScreen
+      onComplete={() => {
+        // Go back to where they were trying to go, or home
+        const from = (location.state as any)?.from?.pathname || '/';
+        navigate(from, { replace: true });
+      }}
+    />
+  );
+}
+
+// Availability match page wrapper
+function AvailabilityMatchPage() {
+  const navigate = useNavigate();
+  
+  return (
+    <AvailabilityMatchScreen
+      onBack={() => navigate(-1)}
+      onNavigate={(screen, data) => {
+        if (screen === 'location-picker') {
+          navigate('/location-picker', { state: data });
+        }
+      }}
+    />
+  );
+}
+
+// Location picker page wrapper
+function LocationPickerPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  return (
+    <LocationPickerScreen
+      match={(location.state as any)?.match}
+      onBack={() => navigate(-1)}
+      onNavigate={(screen) => {
+        if (screen === 'hangout-confirmed') {
+          navigate('/hangout-confirmed');
+        }
+      }}
+    />
+  );
+}
+
+// Hangout confirmed page wrapper
+function HangoutConfirmedPage() {
+  const navigate = useNavigate();
+  
+  return (
+    <HangoutConfirmedScreen
+      onNavigate={() => {
+        navigate('/');
+      }}
+    />
+  );
+}
+
+// Login/Onboarding page
+function LoginPage() {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  if (isAuthenticated) {
+    // Redirect to where they were trying to go, or home
+    const from = (location.state as any)?.from?.pathname || '/';
+    return <Navigate to={from} replace />;
+  }
+
+  return (
+    <OnboardingScreen
+      onComplete={() => {
+        // Will be handled by the auth state change
+        window.location.href = '/';
+      }}
+    />
+  );
+}
+
+// Auth callback handler
+function AuthCallbackPage() {
+  const { isAuthenticated, loading } = useAuth();
+  
+  useEffect(() => {
+    // Give time for auth to process, then redirect
+    const timer = setTimeout(() => {
+      window.location.href = '/';
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!loading && isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <LoadingScreen />;
+}
+
+// Main App Routes
+function AppRoutes() {
+  return (
+    <Routes>
+      {/* Public routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      
+      {/* Protected routes */}
+      <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+      <Route path="/profile-setup" element={<ProtectedRoute><ProfileSetupPage /></ProtectedRoute>} />
+      <Route path="/create-group" element={<ProtectedRoute><CreateGroupPage /></ProtectedRoute>} />
+      <Route path="/join-group" element={<ProtectedRoute><JoinGroupPage /></ProtectedRoute>} />
+      <Route path="/join-group/:code" element={<ProtectedRoute><JoinGroupPage /></ProtectedRoute>} />
+      <Route path="/join/:code" element={<ProtectedRoute><JoinGroupPage /></ProtectedRoute>} />
+      <Route path="/group/:id" element={<ProtectedRoute><GroupPage /></ProtectedRoute>} />
+      <Route path="/group/:id/check-in" element={<ProtectedRoute><CheckInPage /></ProtectedRoute>} />
+      <Route path="/group/:id/settings" element={<ProtectedRoute><GroupSettingsPage /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+      <Route path="/availability-match" element={<ProtectedRoute><AvailabilityMatchPage /></ProtectedRoute>} />
+      <Route path="/location-picker" element={<ProtectedRoute><LocationPickerPage /></ProtectedRoute>} />
+      <Route path="/hangout-confirmed" element={<ProtectedRoute><HangoutConfirmedPage /></ProtectedRoute>} />
+      
+      {/* Catch all - redirect to home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+// Root App component
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
