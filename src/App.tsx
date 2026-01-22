@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RotateCcw, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -52,7 +52,7 @@ function LoadingScreen() {
 
 // Main App Content (needs to be inside AuthProvider)
 function AppContent() {
-  const { user, profile, loading, isAuthenticated, needsOnboarding, signOut } = useAuth();
+  const { user, profile, loading, isAuthenticated, needsOnboarding } = useAuth();
   const [navigationStack, setNavigationStack] = useState<NavigationState[]>([
     { screen: 'home' }
   ]);
@@ -69,7 +69,7 @@ function AppContent() {
       // Clean URL without reload
       window.history.replaceState({}, '', window.location.pathname);
     }
-    
+
     // Also check for /join/:code pattern
     const pathMatch = window.location.pathname.match(/\/join\/([A-Z0-9]+)/i);
     if (pathMatch) {
@@ -92,7 +92,7 @@ function AppContent() {
         setLoadingGroups(false);
       }
     }
-    
+
     if (isAuthenticated) {
       fetchGroups();
     } else {
@@ -139,12 +139,6 @@ function AppContent() {
     setNavigationStack([{ screen: 'group', data: group }]);
   };
 
-  const resetApp = async () => {
-    await signOut();
-    setNavigationStack([{ screen: 'home' }]);
-    setUserGroups([]);
-  };
-
   // Show loading while checking auth
   if (loading || (isAuthenticated && loadingGroups)) {
     return <LoadingScreen />;
@@ -163,7 +157,7 @@ function AppContent() {
   // Has invite code -> Go to join group
   if (inviteCode && currentNav.screen !== 'join-group') {
     return (
-      <JoinGroupScreen 
+      <JoinGroupScreen
         inviteCode={inviteCode}
         onBack={() => {
           setInviteCode(null);
@@ -184,158 +178,102 @@ function AppContent() {
     );
   }
 
-  // Demo control - for development
-  const DemoControl = () => (
-    <button
-      onClick={resetApp}
-      className="fixed top-4 right-4 z-50 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-[hsl(var(--color-border))] flex items-center justify-center hover:bg-white transition-colors"
-      title="Sign out"
-    >
-      <RotateCcw className="w-5 h-5 text-[hsl(var(--color-text-secondary))]" />
-    </button>
-  );
-
   // Render current screen
   switch (currentNav.screen) {
     case 'welcome':
       return (
-        <>
-          <DemoControl />
-          <WelcomeScreen
-            onCreateGroup={() => handleNavigate('create-group')}
-            onJoinGroup={() => handleNavigate('join-group')}
-          />
-        </>
+        <WelcomeScreen
+          onCreateGroup={() => handleNavigate('create-group')}
+          onJoinGroup={() => handleNavigate('join-group')}
+        />
       );
 
     case 'create-group':
       return (
-        <>
-          <DemoControl />
-          <CreateGroupScreen
-            onBack={handleBack}
-            onCreated={handleGroupCreated}
-          />
-        </>
+        <CreateGroupScreen
+          onBack={handleBack}
+          onCreated={handleGroupCreated}
+        />
       );
 
     case 'join-group':
       return (
-        <>
-          <DemoControl />
-          <JoinGroupScreen
-            inviteCode={currentNav.data?.inviteCode}
-            onBack={handleBack}
-            onJoined={handleGroupJoined}
-          />
-        </>
+        <JoinGroupScreen
+          inviteCode={currentNav.data?.inviteCode}
+          onBack={handleBack}
+          onJoined={handleGroupJoined}
+        />
       );
 
     case 'home':
       return (
-        <>
-          <DemoControl />
-          <HomeScreen 
-            onNavigate={handleNavigate} 
-            hasGroups={userGroups.length > 0} 
-            groups={userGroups}
-          />
-        </>
+        <HomeScreen
+          onNavigate={handleNavigate}
+          hasGroups={userGroups.length > 0}
+          groups={userGroups}
+        />
       );
 
     case 'group':
       return (
-        <>
-          <DemoControl />
-          <GroupScreen
-            group={currentNav.data}
-            onBack={handleBack}
-            onNavigate={handleNavigate}
-          />
-        </>
+        <GroupScreen
+          group={currentNav.data}
+          onBack={handleBack}
+          onNavigate={handleNavigate}
+        />
       );
 
     case 'check-in':
       return (
-        <>
-          <DemoControl />
-          <CheckInScreen
-            group={currentNav.data}
-            onBack={handleBack}
-            onNavigate={handleNavigate}
-          />
-        </>
+        <CheckInScreen
+          group={currentNav.data}
+          onBack={handleBack}
+          onNavigate={handleNavigate}
+        />
       );
 
     case 'availability-match':
       return (
-        <>
-          <DemoControl />
-          <AvailabilityMatchScreen
-            onBack={handleBack}
-            onNavigate={handleNavigate}
-          />
-        </>
+        <AvailabilityMatchScreen
+          onBack={handleBack}
+          onNavigate={handleNavigate}
+        />
       );
 
     case 'location-picker':
       return (
-        <>
-          <DemoControl />
-          <LocationPickerScreen
-            match={currentNav.data?.match}
-            onBack={handleBack}
-            onNavigate={handleNavigate}
-          />
-        </>
+        <LocationPickerScreen
+          match={currentNav.data?.match}
+          onBack={handleBack}
+          onNavigate={handleNavigate}
+        />
       );
 
     case 'hangout-confirmed':
       return (
-        <>
-          <DemoControl />
-          <HangoutConfirmedScreen
-            onNavigate={(screen) => {
-              setNavigationStack([{ screen: screen as Screen }]);
-            }}
-          />
-        </>
+        <HangoutConfirmedScreen
+          onNavigate={(screen) => {
+            setNavigationStack([{ screen: screen as Screen }]);
+          }}
+        />
       );
 
     case 'settings':
-      return (
-        <>
-          <DemoControl />
-          <SettingsScreen onBack={handleBack} />
-        </>
-      );
+      return <SettingsScreen onBack={handleBack} />;
 
     case 'notifications':
-      return (
-        <>
-          <DemoControl />
-          <NotificationsScreen onBack={handleBack} onNavigate={handleNavigate} />
-        </>
-      );
+      return <NotificationsScreen onBack={handleBack} onNavigate={handleNavigate} />;
 
     case 'group-settings':
-      return (
-        <>
-          <DemoControl />
-          <GroupSettingsScreen group={currentNav.data} onBack={handleBack} />
-        </>
-      );
+      return <GroupSettingsScreen group={currentNav.data} onBack={handleBack} />;
 
     default:
       return (
-        <>
-          <DemoControl />
-          <HomeScreen 
-            onNavigate={handleNavigate} 
-            hasGroups={userGroups.length > 0}
-            groups={userGroups}
-          />
-        </>
+        <HomeScreen
+          onNavigate={handleNavigate}
+          hasGroups={userGroups.length > 0}
+          groups={userGroups}
+        />
       );
   }
 }
