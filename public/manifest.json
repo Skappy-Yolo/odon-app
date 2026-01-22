@@ -1,0 +1,31 @@
+{
+  "name": "Odon",
+  "short_name": "Odon",
+  "description": "AI-powered friend group hangout coordinator",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f23",
+  "theme_color": "#e8713a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["social", "lifestyle"],
+  "lang": "en"
+}

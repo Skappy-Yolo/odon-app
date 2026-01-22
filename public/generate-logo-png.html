@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Odon Logo PNG Generator</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1a1a2e;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      gap: 20px;
+    }
+    h1 { margin: 0; }
+    .preview {
+      display: flex;
+      gap: 40px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .logo-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    canvas {
+      border: 2px solid #333;
+      border-radius: 12px;
+    }
+    button {
+      background: linear-gradient(135deg, #e8713a, #f5a623);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      font-weight: bold;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    .instructions {
+      background: #2a2a4a;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 500px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Odon Logo PNG Generator</h1>
+  
+  <div class="preview">
+    <div class="logo-box">
+      <canvas id="canvas192" width="192" height="192"></canvas>
+      <button onclick="download(192)">Download 192x192 PNG</button>
+    </div>
+    <div class="logo-box">
+      <canvas id="canvas512" width="512" height="512"></canvas>
+      <button onclick="download(512)">Download 512x512 PNG</button>
+    </div>
+  </div>
+
+  <div class="instructions">
+    <p><strong>For Google OAuth Consent Screen:</strong></p>
+    <p>Click "Download 512x512 PNG" and upload it to:<br>
+    Google Cloud Console - OAuth consent screen - App logo</p>
+  </div>
+
+  <script>
+    function drawLogo(ctx, size) {
+      // Background gradient - ORANGE from Figma!
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#e8713a');  // Orange primary
+      gradient.addColorStop(1, '#f5a623');  // Yellow/gold secondary
+      
+      // Rounded rectangle background
+      const radius = size * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(radius, 0);
+      ctx.lineTo(size - radius, 0);
+      ctx.quadraticCurveTo(size, 0, size, radius);
+      ctx.lineTo(size, size - radius);
+      ctx.quadraticCurveTo(size, size, size - radius, size);
+      ctx.lineTo(radius, size);
+      ctx.quadraticCurveTo(0, size, 0, size - radius);
+      ctx.lineTo(0, radius);
+      ctx.quadraticCurveTo(0, 0, radius, 0);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      
+      const cx = size / 2;
+      const cy = size / 2;
+      const ringRadius = size * 0.28;
+      const ringWidth = size * 0.06;
+      const dotRadius = size * 0.04;
+      
+      // Outer ring
+      ctx.beginPath();
+      ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.lineWidth = ringWidth;
+      ctx.stroke();
+      
+      // Top dot
+      ctx.beginPath();
+      ctx.arc(cx, cy - ringRadius * 0.8, dotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.fill();
+      
+      // Right dot
+      ctx.beginPath();
+      ctx.arc(cx + ringRadius * 0.6, cy - ringRadius * 0.2, dotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.fill();
+      
+      // Bottom dot
+      ctx.beginPath();
+      ctx.arc(cx, cy + ringRadius * 0.5, dotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.fill();
+      
+      // Left dot
+      ctx.beginPath();
+      ctx.arc(cx - ringRadius * 0.6, cy - ringRadius * 0.2, dotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.fill();
+      
+      // Center dot
+      ctx.beginPath();
+      ctx.arc(cx, cy - ringRadius * 0.1, dotRadius * 0.6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.fill();
+    }
+    
+    function download(size) {
+      const canvas = document.getElementById('canvas' + size);
+      const link = document.createElement('a');
+      link.download = 'odon-logo-' + size + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+    
+    // Draw on load
+    window.onload = function() {
+      drawLogo(document.getElementById('canvas192').getContext('2d'), 192);
+      drawLogo(document.getElementById('canvas512').getContext('2d'), 512);
+    };
+  </script>
+</body>
+</html>

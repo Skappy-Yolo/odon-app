@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8713a"/>
+      <stop offset="100%" style="stop-color:#f5a623"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="192" height="192" rx="42" fill="url(#grad)"/>
+  <!-- Outer ring -->
+  <circle cx="96" cy="96" r="54" fill="none" stroke="white" stroke-width="12" opacity="0.9"/>
+  <!-- Inner dots representing friend group -->
+  <circle cx="96" cy="54" r="8" fill="white" opacity="0.95"/>
+  <circle cx="127" cy="81" r="8" fill="white" opacity="0.85"/>
+  <circle cx="96" cy="119" r="8" fill="white" opacity="0.95"/>
+  <circle cx="65" cy="81" r="8" fill="white" opacity="0.85"/>
+  <!-- Center connection point -->
+  <circle cx="96" cy="90" r="5" fill="white" opacity="0.7"/>
+</svg>
