@@ -1,6 +1,6 @@
 /**
  * Authentication Context for Odon PWA
- * 
+ *
  * Provides auth state throughout the app without modifying screen visuals.
  */
 
@@ -26,7 +26,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   error: string | null;
-  
+
   // Auth methods
   signInWithGoogle: () => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<{ success: boolean; message: string }>;
@@ -34,11 +34,11 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
   signOut: () => Promise<void>;
-  
+
   // Profile methods
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   completeOnboarding: () => Promise<void>;
-  
+
   // State
   isAuthenticated: boolean;
   isNewUser: boolean;
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch user profile from database
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -63,7 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // Not found is okay for new users
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = not found, which is okay for new users
         console.error('Error fetching profile:', error);
         return null;
       }
@@ -75,61 +76,123 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Create profile for new user
-  const createProfile = async (user: User): Promise<UserProfile> => {
-    const provider = user.app_metadata.provider || 'email';
-    const name = user.user_metadata.name || user.user_metadata.full_name || user.email?.split('@')[0] || 'User';
-    
+  // Create profile for new user (with retry logic for trigger race condition)
+  const createProfile = async (authUser: User): Promise<UserProfile | null> => {
+    const provider = authUser.app_metadata.provider || 'email';
+    const name = authUser.user_metadata.name || authUser.user_metadata.full_name || authUser.email?.split('@')[0] || 'User';
+
+    // First, check if profile already exists (trigger might have created it)
+    const existingProfile = await fetchProfile(authUser.id);
+    if (existingProfile) {
+      console.log('Profile already exists (created by trigger)');
+      return existingProfile;
+    }
+
+    // Wait a moment for trigger to complete, then check again
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const profileAfterWait = await fetchProfile(authUser.id);
+    if (profileAfterWait) {
+      console.log('Profile found after wait (trigger created it)');
+      return profileAfterWait;
+    }
+
+    // If still no profile, create it manually
     const newProfile = {
-      id: user.id,
+      id: authUser.id,
       name,
-      email: user.email || '',
+      email: authUser.email || '',
       auth_provider: provider as 'google' | 'apple' | 'email',
-      avatar_url: user.user_metadata.avatar_url || user.user_metadata.picture || null,
+      avatar_url: authUser.user_metadata.avatar_url || authUser.user_metadata.picture || null,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       onboarding_completed: false,
       calendar_connected: false,
     };
 
-    const { data, error } = await supabase
-      .from('users')
-      .insert(newProfile)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .insert(newProfile)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error creating profile:', error);
-      // If user already exists (race condition), fetch it
-      if (error.code === '23505') {
-        const existing = await fetchProfile(user.id);
-        if (existing) return existing;
+      if (error) {
+        console.error('Error creating profile:', error);
+        // If duplicate key (23505), try to fetch again
+        if (error.code === '23505') {
+          const existing = await fetchProfile(authUser.id);
+          if (existing) return existing;
+        }
+        return null;
       }
-      throw error;
-    }
 
-    return data;
+      return data;
+    } catch (err) {
+      console.error('Error in createProfile:', err);
+      return null;
+    }
+  };
+
+  // Handle auth callback URL (tokens in hash fragment)
+  const handleAuthCallback = async () => {
+    const hash = window.location.hash;
+    const isCallback = window.location.pathname === '/auth/callback' || hash.includes('access_token');
+    
+    if (isCallback && hash) {
+      console.log('Processing auth callback...');
+      
+      // The Supabase client should automatically handle the hash
+      // But we need to ensure getSession() is called after hash is processed
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error getting session from callback:', error);
+      }
+      
+      if (session) {
+        console.log('Session established from callback');
+        // Clean up the URL (remove hash and redirect to home)
+        window.history.replaceState({}, '', '/');
+      }
+      
+      return session;
+    }
+    
+    return null;
   };
 
   // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user || null);
-
-      if (session?.user) {
-        let userProfile = await fetchProfile(session.user.id);
+    const initialize = async () => {
+      try {
+        // First, handle any auth callback in the URL
+        const callbackSession = await handleAuthCallback();
         
-        // Create profile if doesn't exist (new user)
-        if (!userProfile) {
-          userProfile = await createProfile(session.user);
+        // Get session (either from callback or existing)
+        const { data: { session } } = await supabase.auth.getSession();
+        const activeSession = callbackSession || session;
+        
+        setSession(activeSession);
+        setUser(activeSession?.user || null);
+
+        if (activeSession?.user) {
+          // Try to get or create profile
+          let userProfile = await fetchProfile(activeSession.user.id);
+          
+          if (!userProfile) {
+            userProfile = await createProfile(activeSession.user);
+          }
+          
+          setProfile(userProfile);
         }
-        
-        setProfile(userProfile);
-      }
 
-      setLoading(false);
-    });
+        setLoading(false);
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        setLoading(false);
+      }
+    };
+
+    initialize();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -147,6 +210,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(userProfile);
       } else {
         setProfile(null);
+      }
+
+      // If this is a sign-in event and we're on the callback URL, clean it up
+      if (event === 'SIGNED_IN' && window.location.pathname === '/auth/callback') {
+        window.history.replaceState({}, '', '/');
       }
 
       setLoading(false);
