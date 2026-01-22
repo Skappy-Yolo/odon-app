@@ -178,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (sessionError) {
         console.error('Session error:', sessionError);
-        setError('Failed to get session. Please try again.');
+        // Don't block - just show login screen
         setLoading(false);
         return;
       }
@@ -189,40 +189,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(activeSession?.user || null);
 
       if (activeSession?.user) {
-        // Try to get or create profile with timeout
-        const timeoutPromise = new Promise<null>((_, reject) => 
-          setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
-        );
-        
+        // Try to get profile - but don't block if it fails
         try {
-          let userProfile = await Promise.race([
-            fetchProfile(activeSession.user.id),
-            timeoutPromise
-          ]) as UserProfile | null;
+          let userProfile = await fetchProfile(activeSession.user.id);
           
           if (!userProfile) {
-            userProfile = await createProfile(activeSession.user);
+            // Try to create profile once
+            try {
+              userProfile = await createProfile(activeSession.user);
+            } catch (createErr) {
+              console.error('Could not create profile:', createErr);
+              // Continue anyway - user is authenticated
+            }
           }
           
           setProfile(userProfile);
-          
-          if (!userProfile) {
-            // Profile still not found/created - but continue anyway
-            // User can still use the app, profile will be created on next action
-            console.warn('Could not load or create profile, continuing without it');
-          }
         } catch (profileError) {
           console.error('Profile error:', profileError);
-          // Don't block the app - continue with null profile
-          // The user is authenticated, they can retry or proceed
+          // Continue without profile - user can still use the app
           setProfile(null);
         }
       }
 
+      // ALWAYS finish loading - never get stuck
       setLoading(false);
     } catch (err) {
       console.error('Error initializing auth:', err);
-      setError('Something went wrong. Please refresh or try again.');
+      // Don't set error - just finish loading and let user see login/app
       setLoading(false);
     }
   };
