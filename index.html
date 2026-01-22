@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#6366f1" />
+    <meta name="theme-color" content="#e8713a" />
     <meta name="description" content="Odon - AI-powered friend group hangout coordinator" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -19,9 +19,50 @@
     <link rel="manifest" href="/manifest.json" />
     
     <title>Odon</title>
+    
+    <style>
+      .privacy-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 8px;
+        text-align: center;
+        font-size: 12px;
+        color: #666;
+        background: rgba(255,255,255,0.9);
+        z-index: 9999;
+      }
+      .privacy-footer a {
+        color: #e8713a;
+        text-decoration: none;
+      }
+      .privacy-footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Privacy footer for Google verification -->
+    <noscript>
+      <div class="privacy-footer">
+        <a href="/privacy.html">Privacy Policy</a>
+      </div>
+    </noscript>
+    <div class="privacy-footer" id="privacy-footer">
+      <a href="/privacy.html">Privacy Policy</a>
+    </div>
+    <script>
+      // Hide privacy footer after app loads (it's inside the React app)
+      setTimeout(() => {
+        const footer = document.getElementById('privacy-footer');
+        if (footer && document.querySelector('#root > *')) {
+          footer.style.display = 'none';
+        }
+      }, 2000);
+    </script>
   </body>
 </html>
