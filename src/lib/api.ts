@@ -14,9 +14,9 @@ function generateInviteCode(): string {
   return code;
 }
 
-// ============================================
+// ---
 // USER API
-// ============================================
+// ---
 
 export const userApi = {
   async getProfile(): Promise<User | null> {
@@ -56,9 +56,9 @@ export const userApi = {
   },
 };
 
-// ============================================
+// ---
 // GROUPS API
-// ============================================
+// ---
 
 export const groupsApi = {
   async getMyGroups(): Promise<Group[]> {
@@ -226,9 +226,9 @@ export const groupsApi = {
   },
 };
 
-// ============================================
+// ---
 // CHECK-INS API
-// ============================================
+// ---
 
 export const checkInsApi = {
   async getActiveCheckIn(groupId: string): Promise<CheckIn | null> {
@@ -336,9 +336,9 @@ export const checkInsApi = {
   },
 };
 
-// ============================================
+// ---
 // EVENTS API
-// ============================================
+// ---
 
 export const eventsApi = {
   async getGroupEvents(groupId: string): Promise<Event[]> {
@@ -390,9 +390,9 @@ export const eventsApi = {
   },
 };
 
-// ============================================
+// ---
 // NOTIFICATIONS API
-// ============================================
+// ---
 
 export const notificationsApi = {
   async getNotifications(): Promise<Notification[]> {
@@ -461,3 +461,4 @@ export const notificationsApi = {
     };
   },
 };
+

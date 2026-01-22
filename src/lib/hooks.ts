@@ -10,9 +10,9 @@ import { supabase, auth } from './supabase';
 import { userApi, groupsApi, checkInsApi, eventsApi, notificationsApi } from './api';
 import type { User, Group, Event, Notification } from './supabase';
 
-// ============================================
+// ---
 // AUTH HOOK
-// ============================================
+// ---
 
 export function useAuth() {
   const [user, setUser] = useState<any>(null);
@@ -65,9 +65,9 @@ export function useAuth() {
   };
 }
 
-// ============================================
+// ---
 // USER PROFILE HOOK
-// ============================================
+// ---
 
 export function useProfile() {
   const [profile, setProfile] = useState<User | null>(null);
@@ -89,9 +89,9 @@ export function useProfile() {
   return { profile, loading, updateProfile };
 }
 
-// ============================================
+// ---
 // GROUPS HOOK
-// ============================================
+// ---
 
 export function useGroups() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -131,9 +131,9 @@ export function useGroups() {
   return { groups, loading, fetchGroups, createGroup, joinGroup };
 }
 
-// ============================================
+// ---
 // SINGLE GROUP HOOK
-// ============================================
+// ---
 
 export function useGroup(groupId: string | null) {
   const [group, setGroup] = useState<(Group & { members: any[] }) | null>(null);
@@ -163,9 +163,9 @@ export function useGroup(groupId: string | null) {
   return { group, loading, updateSettings };
 }
 
-// ============================================
+// ---
 // EVENTS HOOK
-// ============================================
+// ---
 
 export function useUpcomingEvents() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -181,9 +181,9 @@ export function useUpcomingEvents() {
   return { events, loading };
 }
 
-// ============================================
+// ---
 // NOTIFICATIONS HOOK
-// ============================================
+// ---
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -225,9 +225,9 @@ export function useNotifications() {
   return { notifications, unreadCount, loading, markAsRead, markAllAsRead };
 }
 
-// ============================================
+// ---
 // CHECK-IN HOOK
-// ============================================
+// ---
 
 export function useCheckIn(groupId: string | null) {
   const [checkIn, setCheckIn] = useState<any>(null);
@@ -269,3 +269,4 @@ export function useCheckIn(groupId: string | null) {
 
   return { checkIn, mySlots, loading, submitAvailability, confirmAll, snooze };
 }
+
